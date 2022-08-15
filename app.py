@@ -9,10 +9,13 @@ from plot_functions import *
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 import dash_bootstrap_components as dbc
+from datafunctions import *
+from names import Stock_names
+#lod = {i: load_data(i, 100) for i in STOCKS}
 
 
-
-app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+# Basic Stock Dashboard
+app = dash.Dash(external_stylesheets=[dbc.themes.CYBORG])
 
 sp = get_price_data(STOCKS)
 
@@ -25,8 +28,8 @@ app.layout = html.Div(id = 'parent', children = [
         options = [{'label': f'{val} ({key})', 'value': key} for key, val in Stock_names.items()],
         value = 'SPY'),
         dcc.Graph(id = 'bar_plot'),
-        dcc.Graph(id = 'VolumeProfile'),
-        dcc.Graph(id = 'Dual_plot')
+        dcc.Graph(id = 'VolumeProfile'), 
+        dcc.Graph(id = 'Stock Returns')
     ])
     
     
@@ -34,14 +37,16 @@ app.layout = html.Div(id = 'parent', children = [
               [Input(component_id='dropdown', component_property= 'value')])
     
 def graph_update(dropdown_value):
-    print(dropdown_value, '\n')
-    df = add_stock_price(dropdown_value, sp)
-    
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x = df.index, y = df['Close']))
-    fig.update_layout(title = f'{dropdown_value} Close Price', xaxis_title = 'Date', yaxis_title = 'Price')
-    # Ret
-    return fig  
+    def candle_stick(stock):
+        df = add_stock_price(stock, sp)
+        fig = go.Figure()
+        fig.add_trace(go.Candlestick(x=df.index, open=df.Open, high=df.High, low=df.Low, close=df.Close))
+        fig.update_layout(xaxis_rangeslider_visible=False)
+        fig.update_layout(title_text=f'${stock.upper()} Stock Price')
+        fig.update_xaxes(title_text="<b>Date</b>")
+        fig.update_yaxes(title_text="<b>Price</b>")
+        return fig
+    return candle_stick(dropdown_value)
 
 @app.callback(Output(component_id='VolumeProfile', component_property= 'figure'),
                 [Input(component_id='dropdown', component_property= 'value')])
@@ -54,13 +59,19 @@ def volume_profiler(dropdown_value):
                       )
     return fig
 
+@app.callback(Output(component_id='Stock Returns', component_property= 'figure'),
+                [Input(component_id='dropdown', component_property= 'value')])
 
-@app.callback(Output(component_id='Dual_Plot', component_property= 'figure'),
-              [Input(component_id='dropdown', component_property= 'value')])
-
-def dual_plot_space(dropdown_value):
-    return dual_plot(dropdown_value, sp)
-
+def stock_returns(dropdown_value):
+    def Stock_returns(stock):
+        df = add_stock_price(stock, sp)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=df.index, y=df.Close.pct_change(), name="Returns"))
+        fig.update_layout(title_text=f'{stock} Returns')
+        fig.update_xaxes(title_text="<b>Date</b>")
+        fig.update_yaxes(title_text="<b>Returns</b>")
+        return fig
+    return Stock_returns(dropdown_value)
 
 if __name__ == '__main__': 
     app.run_server()
